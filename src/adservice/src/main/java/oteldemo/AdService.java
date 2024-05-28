@@ -12,10 +12,10 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.*;
 import io.grpc.stub.StreamObserver;
 import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
@@ -31,7 +31,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import oteldemo.Demo.Ad;
@@ -46,6 +45,9 @@ import dev.openfeature.sdk.EvaluationContext;
 import dev.openfeature.sdk.MutableContext;
 import dev.openfeature.sdk.OpenFeatureAPI;
 import java.util.UUID;
+import com.google.gson.JsonObject;
+
+import io.opentelemetry.sdk.resources.Resource;
 
 
 public final class AdService {
@@ -73,6 +75,36 @@ public final class AdService {
   private static final AttributeKey<String> adResponseTypeKey =
       AttributeKey.stringKey("app.ads.ad_response_type");
 
+  public static JsonObject GetMsgObject(String msg) {
+    UUID uuid = UUID.randomUUID();
+    String randomUUIDString = uuid.toString();
+    JsonObject msgObj = new JsonObject();
+
+    msgObj.addProperty("id", randomUUIDString);
+    msgObj.addProperty("service", "adservice");
+
+    JsonObject bdy = new JsonObject();
+    bdy.addProperty("message", msg);
+    bdy.addProperty("description", "This is a cool hello, world!");
+
+    msgObj.add("body", bdy);
+
+    return msgObj;
+  }
+
+  // OTEL_RESOURCE_ATTRIBUTES doesn't work for java otel sdk (https://github.com/open-telemetry/opentelemetry-java/issues/5238), so
+  // need to merge the attributes from environment varialbe OTEL_RESOURCE_ATTRIBUTES manually.
+  public static Resource GetOtelResource() {
+    String input = System.getenv("OTEL_RESOURCE_ATTRIBUTES");
+    AttributesBuilder ab = Attributes.builder();
+    for (String pair : input.split(",")) {
+        String[] kv = pair.split("=");
+        ab.put(kv[0], kv[1]);
+    }
+    Resource res = Resource.create(ab.build());
+    return Resource.getDefault().merge(res);
+  }
+
   private void start() throws IOException {
     int port =
         Integer.parseInt(
@@ -99,7 +131,8 @@ public final class AdService {
             .addService(healthMgr.getHealthService())
             .build()
             .start();
-    logger.info("Ad service started, listening on " + port);
+    //logger.info("Ad service started, listening on " + port);
+    logger.info(AdService.GetMsgObject("Ad service started, listening on " + port));
     Runtime.getRuntime()
         .addShutdownHook(
             new Thread(
@@ -165,7 +198,8 @@ public final class AdService {
           evaluationContext.setTargetingKey(sessionId);
           evaluationContext.add("session", sessionId);
         } else {
-          logger.info("no baggage found in context");
+          //logger.info("no baggage found in context");
+          logger.info(AdService.GetMsgObject("no baggage found in context"));
         }
 
         CPULoad cpuload = CPULoad.getInstance();
@@ -174,7 +208,8 @@ public final class AdService {
         span.setAttribute("app.ads.contextKeys", req.getContextKeysList().toString());
         span.setAttribute("app.ads.contextKeys.count", req.getContextKeysCount());
         if (req.getContextKeysCount() > 0) {
-          logger.info("Targeted ad request received for " + req.getContextKeysList());
+          //logger.info("Targeted ad request received for " + req.getContextKeysList());
+          logger.info(AdService.GetMsgObject("Targeted ad request received for " + req.getContextKeysList()));
           for (int i = 0; i < req.getContextKeysCount(); i++) {
             Collection<Ad> ads = service.getAdsByCategory(req.getContextKeys(i));
             allAds.addAll(ads);
@@ -182,7 +217,8 @@ public final class AdService {
           adRequestType = AdRequestType.TARGETED;
           adResponseType = AdResponseType.TARGETED;
         } else {
-          logger.info("Non-targeted ad request received, preparing random response.");
+          //logger.info("Non-targeted ad request received, preparing random response.");
+          logger.info(AdService.GetMsgObject("Non-targeted ad request received, preparing random response."));
           allAds = service.getRandomAds();
           adRequestType = AdRequestType.NOT_TARGETED;
           adResponseType = AdResponseType.RANDOM;
@@ -206,7 +242,8 @@ public final class AdService {
         }
 
         if (ffClient.getBooleanValue(ADSERVICE_MANUAL_GC_FEATURE_FLAG, false, evaluationContext)) {
-          logger.warn("Feature Flag " + ADSERVICE_MANUAL_GC_FEATURE_FLAG + " enabled, performing a manual gc now");
+          //logger.warn("Feature Flag " + ADSERVICE_MANUAL_GC_FEATURE_FLAG + " enabled, performing a manual gc now");
+          logger.warn(AdService.GetMsgObject("Feature Flag" + ADSERVICE_MANUAL_GC_FEATURE_FLAG + " enabled, performing a manual gc now"));
           GarbageCollectionTrigger gct = new GarbageCollectionTrigger();
           gct.doExecute();
         }
@@ -218,7 +255,8 @@ public final class AdService {
         span.addEvent(
             "Error", Attributes.of(AttributeKey.stringKey("exception.message"), e.getMessage()));
         span.setStatus(StatusCode.ERROR);
-        logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
+        //logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
+        logger.warn(AdService.GetMsgObject("GetAds Failed with status " + e.getStatus()));
         responseObserver.onError(e);
       }
     }
@@ -319,7 +357,8 @@ public final class AdService {
   /** Main launches the server from the command line. */
   public static void main(String[] args) throws IOException, InterruptedException {
     // Start the RPC server. You shouldn't see any output from gRPC before this.
-    logger.info("Ad service starting.");
+    //logger.info("Ad service starting.");
+    logger.info(AdService.GetMsgObject("Ad service starting."));
     final AdService service = AdService.getInstance();
     service.start();
     service.blockUntilShutdown();

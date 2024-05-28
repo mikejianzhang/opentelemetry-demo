@@ -28,4 +28,4 @@ ADD --chmod=644 https://github.com/open-telemetry/opentelemetry-java-instrumenta
 ENV JAVA_TOOL_OPTIONS=-javaagent:/usr/src/app/opentelemetry-javaagent.jar
 
 EXPOSE ${AD_SERVICE_PORT}
-ENTRYPOINT [ "./build/install/opentelemetry-demo-ad-service/bin/AdService" ]
+ENTRYPOINT [ "./build/install/adservice/bin/AdService" ]

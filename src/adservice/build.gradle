@@ -1,7 +1,7 @@
 
 plugins {
     id 'com.google.protobuf' version '0.9.4'
-    id 'com.github.sherter.google-java-format' version '0.9'
+    //id 'com.github.sherter.google-java-format' version '0.9'
     id 'idea'
     id 'application'
     id 'com.github.ben-manes.versions' version '0.49.0'
@@ -22,9 +22,14 @@ def grpcVersion = "1.59.0"
 def jacksonVersion = "2.15.3"
 def protocVersion = "3.25.0"
 
+configurations {
+    // create a separate configuration for the agent since it should not be a normal dependency
+    agent
+}
+
 tasks.withType(JavaCompile).configureEach {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 ext {
@@ -48,14 +53,20 @@ dependencies {
                 "io.grpc:grpc-services:${grpcVersion}",
                 "io.opentelemetry:opentelemetry-api",
                 "io.opentelemetry:opentelemetry-sdk",
+                "io.opentelemetry:opentelemetry-sdk-logs",
                 "io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations",
                 "org.apache.logging.log4j:log4j-core:2.21.1",
                 "dev.openfeature.contrib.providers:flagd:0.7.0",
-                'dev.openfeature:sdk:1.7.4'
+                'dev.openfeature:sdk:1.7.4',
+                "io.opentelemetry.instrumentation:opentelemetry-log4j-appender-2.17",
+                "com.google.code.gson:gson:2.7",
+                "org.json:json:20230618"
 
         runtimeOnly "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}",
                 "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}",
                 "io.netty:netty-tcnative-boringssl-static:2.0.62.Final"
+
+        agent("io.opentelemetry.javaagent:opentelemetry-javaagent:1.33.3")
     }
 }
 
@@ -72,13 +83,13 @@ tasks.register('copyProtos', Copy) {
 
 // Include the output directory of copyProtos in main source set so they are
 // picked up by the protobuf plugin
-sourceSets {
+/*sourceSets {
     main {
         proto {
             srcDir(protoDestDir)
         }
     }
-}
+}*/
 
 protobuf {
     protoc {
@@ -103,17 +114,22 @@ afterEvaluate {
     tasks.getByName('generateProto').dependsOn 'copyProtos'
 }
 
-googleJavaFormat {
+/*googleJavaFormat {
     toolVersion '1.18.1'
-}
+}*/
 
 // Inform IDEs like IntelliJ IDEA, Eclipse or NetBeans about the generated code.
 sourceSets {
     main {
+        proto {
+            srcDir(protoDestDir)
+        }
         java {
             srcDirs 'oteldemo'
-            srcDirs 'build/generated/source/proto/main/java/oteldemo'
-            srcDirs 'build/generated/source/proto/main/grpc/oteldemo'
+            //srcDirs 'build/generated/source/proto/main/java/oteldemo'
+            //srcDirs 'build/generated/source/proto/main/grpc/oteldemo'
+            srcDirs 'build/generated/source/proto/main/java'
+            srcDirs 'build/generated/source/proto/main/grpc'
         }
     }
 }
@@ -140,3 +156,11 @@ applicationDistribution.into('bin') {
     from(adService)
     fileMode = 0755
 }
+
+def copyAgent = tasks.register('copyAgent', Copy) {
+    from configurations.agent.singleFile
+    into layout.buildDirectory.dir('agent')
+    rename 'opentelemetry-javaagent-.*\\.jar', 'opentelemetry-javaagent.jar'
+}
+
+tasks.build.dependsOn(copyAgent)

@@ -1,0 +1,13 @@
+version: '3'
+services:
+  collector:
+    image: artifactory.cloud.ingka-system.cn/ccoecn-docker-virtual/otel/opentelemetry-collector-contrib:0.100.0
+    volumes:
+      - ./otel-config.yaml:/otel-config.yaml
+    command: ["--config=/otel-config.yaml"]
+    expose:
+      - "4317"
+      - "4318"
+    ports:
+      - "4317:4317"
+      - "4318:4318"
