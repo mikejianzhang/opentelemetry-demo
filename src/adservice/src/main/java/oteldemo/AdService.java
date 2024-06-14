@@ -251,12 +251,14 @@ public final class AdService {
         AdResponse reply = AdResponse.newBuilder().addAllAds(allAds).build();
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
+        span.setStatus(StatusCode.OK, "getAds ok");
       } catch (StatusRuntimeException e) {
         span.addEvent(
             "Error", Attributes.of(AttributeKey.stringKey("exception.message"), e.getMessage()));
         span.setStatus(StatusCode.ERROR);
         //logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
         logger.warn(AdService.GetMsgObject("GetAds Failed with status " + e.getStatus()));
+        span.setStatus(StatusCode.ERROR, "GetAds Failed with status " + e.getStatus());
         responseObserver.onError(e);
       }
     }
@@ -267,7 +269,8 @@ public final class AdService {
   @WithSpan("getAdsByCategory")
   private Collection<Ad> getAdsByCategory(@SpanAttribute("app.ads.category") String category) {
     Collection<Ad> ads = adsMap.get(category);
-    Span.current().setAttribute("app.ads.count", ads.size());
+    Span.current().setAttribute("app.ads.count", ads.size()).setStatus(StatusCode.OK, "getAdsByCategory ok");
+
     return ads;
   }
 
@@ -290,6 +293,7 @@ public final class AdService {
       span.setAttribute("app.ads.count", ads.size());
 
     } finally {
+      span.setStatus(StatusCode.OK, "getRandomAds ok");
       span.end();
     }
 
